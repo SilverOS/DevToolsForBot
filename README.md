@@ -1,5 +1,6 @@
 # DevToolsForBot
 PHP bot to manage your Telegram Bots written using [Silbot Framework v1.4.1](https://github.com/SilverOS/Silbot-Webhook).
+Telegram: [@DevToolsForBot](https://t.me/devtoolsforbot)
 <img src="https://www.silveros.it/img/devtoolsbanner.png" />
 - - -
 # Installation
