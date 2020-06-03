@@ -504,7 +504,7 @@ if (isset($bot)) {
                                 } else {
                                     $user->db->setColumn('state', 'setwb ' . $tok . ' 0');
                                     //TODO Webhook Models
-                                    $bot->editMessageText($user, $message, $l['send_url'], $kb);
+                                    $bot->sendMessage($user, $message, $l['send_url'], $kb);
                                     $callback->answer();
                                 }
                             } elseif (isset($ex[2])) {
