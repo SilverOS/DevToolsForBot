@@ -13,11 +13,13 @@ lang varchar(10),
 type varchar(10),
 PRIMARY KEY (chat_id))');
     $install->execute();
-    $install = $db->prepare('CREATE TABLE IF NOT EXISTS ' . $config['database']['bot_table'] . ' (
-chat_id bigint(0),
-state varchar(300),
-bots text NOT NULL,
-models text NOT NULL
-PRIMARY KEY (chat_id))');
+    $install = $db->prepare('CREATE TABLE IF NOT EXISTS ' . $config['database']['bot_table'] . '  (
+  `chat_id` bigint(20) NOT NULL,
+  `state` varchar(300) DEFAULT NULL,
+  `lang` varchar(2) NOT NULL DEFAULT \'\',
+  `bots` text NOT NULL,
+  `models` text NOT NULL,
+  `model` int(3) NOT NULL DEFAULT \'0\'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;');
     $install->execute();
 }
