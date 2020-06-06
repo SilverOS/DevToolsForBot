@@ -51,10 +51,85 @@ if (isset($bot)) {
                     if ($user->db->state != '') $user->db->setColumn('state', '');
                     $kb = [
                         [['text' => $l['manage_bots'], 'callback_data' => '/bots']],
+                        [['text' => $l['wb_models'], 'callback_data' => '/models']],
                         [['text' => $l['change_lang'], 'callback_data' => '/setlang']],
                         [['text' => $l['go_back'], 'callback_data' => '/start']],
                     ];
                     $bot->editMessageText($chat, $message, $l['settings_text'], $kb);
+                    $callback->answer();
+                } elseif (isset($callback) && stripos($callback->data, '/models') === 0) {
+                    if ($user->db->state != '') $user->db->setColumn('state', '');
+                    $p = explode(' ', $callback->data)[1];
+                    if (!$p) $p = 1;
+                    $kb[] = [['text' => $l['add_model'], 'callback_data' => '/addmodel']];
+                    $models = json_decode($user->db->models,true);
+                    $c = count($models);
+                    $embool = ['','✅ '];
+                    if ($c > 0) {
+                        $min = ($p - 1) * 6;
+                        if ($c < $min) {
+                            $callback->answer($l['404_page'], true);
+                            exit;
+                        }
+                        $max = $p * 6;
+                        if ($c < $max) $max = $c;
+                        $count = 0;
+                        foreach ($models as $modelID => $modelInfo) {
+                            if ($count >= $min && $count < $max) {
+                                $line[] = ['text' => $embool[$user->db->model == $modelID] . $modelInfo['name'], 'callback_data' => '/managemodel ' . $modelID];
+                                if ($count % 2 === 1 || $count === $max - 1) {
+                                    $kb[] = $line;
+                                    unset($line);
+                                }
+                            } elseif ($count >= $max) {
+                                break;
+                            }
+                            $count++;
+                        }
+
+                        if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/models' . ($p - 1)];
+                        if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/models ' . ($p + 1)];
+                        if (isset($nav)) $kb[] = $nav;
+                    }
+                    $kb[] = [['text' => $l['go_back'], 'callback_data' => '/setwebhook']];
+                    $bot->editMessageText($chat, $message, $l['models_text'], $kb);
+                    $callback->answer();
+                } elseif (isset($callback) && stripos($callback->data,'/managemodel') === 0) {
+                    $model = explode(' ',$callback->data)[1];
+                    $models = json_decode($user->db->models,true);
+                    if (!isset($models[$model])) {
+                        $callback->answer($l['404_page']);
+                    } else {
+                        if (isset(explode(' ',$callback->data)[2])) {
+                            $callback->answer($l['model_selected'],true);
+                            $user->db->setColumn('model',$model);
+                            $user->db->model = $model;
+                        }
+                        $user->db->model == $model ? $t = $l['selected'] : $t = $l['select'];
+
+                        $kb[] = [['text' => $t, 'callback_data' => '/managemodel ' . $model . ' select']];
+                        if ($model > 0) $kb[] = [['text' => $l['delete_model'], 'callback_data' => '/deletemodel ' . $model]];
+                        $kb[] = [['text' => $l['go_back'], 'callback_data' => '/models']];
+                        $m = $models[$model];
+                        $bot->editMessageText($chat, $message, str_replace(['&name','&limit','&format'],[$m['name'],$m['limit'],$m['format']],$l['managemodel_text']), $kb);
+                        $callback->answer();
+                    }
+                } elseif (isset($callback) && stripos($callback->data,'/deletemodel') === 0) {
+                    $model = explode(' ',$callback->data)[1];
+                    $models = json_decode($user->db->models,true);
+                    if (!isset($models[$model])|| $model == 0) {
+                        $callback->answer($l['404_page']);
+                    } else {
+                        $kb[] = [['text' => $l['go_back'], 'callback_data' => '/models']];
+                        unset($models[$model]);
+                        $user->db->setColumn('models',json_encode($models));
+                        $bot->editMessageText($chat, $message, $l['model_deleted'], $kb);
+                        $callback->answer();
+                    }
+                } elseif (isset($callback) && stripos($callback->data,'/addmodel') === 0) {
+                    $kb[] = [['text' => $l['go_back'], 'callback_data' => '/models']];
+                    $user->db->setColumn('state','addmodel{}');
+                    $bot->editMessageText($chat, $message, $l['addmodel_text'], $kb);
                     $callback->answer();
                 } elseif (isset($callback) && stripos($callback->data, '/setlang') === 0) {
                     $lang = explode(' ',$callback->data)[1];
@@ -97,16 +172,21 @@ if (isset($bot)) {
                         }
                         $max = $p * 6;
                         if ($c < $max) $max = $c;
-                        $count = $min;
+                        $count = 0;
                         foreach ($bots as $botID => $botInfo) {
-                            $line[] = ['text' => $botInfo['username'], 'callback_data' => '/managebot ' . $botID];
-                            if ($count % 2 === 1 || $count === $max - 1) {
-                                $kb[] = $line;
+                            if ($count >= $min && $count < $max) {
+                                $line[] = ['text' => $botInfo['username'], 'callback_data' => '/managebot ' . $botID];
+                                if ($count % 2 === 1 || $count === $max - 1) {
+                                    $kb[] = $line;
+                                    unset($line);
+                                }
+                            } elseif ($count >= $max) {
+                                break;
                             }
                             $count++;
                         }
                         if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/bots ' . ($p - 1)];
-                        if ($c >= $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
+                        if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
                         if (isset($nav)) $kb[] = $nav;
                     }
                     $kb[] = [['text' => $l['go_back'], 'callback_data' => '/start']];
@@ -193,16 +273,21 @@ if (isset($bot)) {
                             }
                             $max = $p * 6;
                             if ($c < $max) $max = $c;
-                            $count = $min;
+                            $count = 0;
                             foreach ($bots as $botID => $botInfo) {
-                                $line[] = ['text' => $botInfo['username'], 'callback_data' => '/webhookinfo ' . $botID];
-                                if ($count % 2 === 1 || $count === $max - 1) {
-                                    $kb[] = $line;
+                                if ($count >= $min && $count < $max) {
+                                    $line[] = ['text' => $botInfo['username'], 'callback_data' => '/webhookinfo ' . $botID];
+                                    if ($count % 2 === 1 || $count === $max - 1) {
+                                        $kb[] = $line;
+                                        unset($line);
+                                    }
+                                } elseif ($count >= $max) {
+                                    break;
                                 }
                                 $count++;
                             }
                             if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/bots ' . ($p - 1)];
-                            if ($c >= $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
+                            if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
                             if (isset($nav)) $kb[] = $nav;
                         }
                         $user->db->setColumn('state', 'infowb');
@@ -253,16 +338,21 @@ if (isset($bot)) {
                             }
                             $max = $p * 6;
                             if ($c < $max) $max = $c;
-                            $count = $min;
+                            $count = 0;
                             foreach ($bots as $botID => $botInfo) {
-                                $line[] = ['text' => $botInfo['username'], 'callback_data' => '/deletewb ' . $botID];
-                                if ($count % 2 === 1 || $count === $max - 1) {
-                                    $kb[] = $line;
+                                if ($count >= $min && $count < $max) {
+                                    $line[] = ['text' => $botInfo['username'], 'callback_data' => '/deletewb ' . $botID];
+                                    if ($count % 2 === 1 || $count === $max - 1) {
+                                        $kb[] = $line;
+                                        unset($line);
+                                    }
+                                } elseif ($count >= $max) {
+                                    break;
                                 }
                                 $count++;
                             }
                             if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/bots ' . ($p - 1)];
-                            if ($c >= $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
+                            if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
                             if (isset($nav)) $kb[] = $nav;
                         }
                         $user->db->setColumn('state', 'deletewb');
@@ -309,15 +399,21 @@ if (isset($bot)) {
                             $max = $p * 6;
                             if ($c < $max) $max = $c;
                             $count = $min;
+                            $count = 0;
                             foreach ($bots as $botID => $botInfo) {
-                                $line[] = ['text' => $botInfo['username'], 'callback_data' => '/deleteup ' . $botID];
-                                if ($count % 2 === 1 || $count === $max - 1) {
-                                    $kb[] = $line;
+                                if ($count >= $min && $count < $max) {
+                                    $line[] = ['text' => $botInfo['username'], 'callback_data' => '/deleteup ' . $botID];
+                                    if ($count % 2 === 1 || $count === $max - 1) {
+                                        $kb[] = $line;
+                                        unset($line);
+                                    }
+                                } elseif ($count >= $max) {
+                                    break;
                                 }
                                 $count++;
                             }
                             if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/bots ' . ($p - 1)];
-                            if ($c >= $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
+                            if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
                             if (isset($nav)) $kb[] = $nav;
                         }
                         $user->db->setColumn('state', 'deleteup');
@@ -329,6 +425,7 @@ if (isset($bot)) {
                     $ex = explode(' ', $callback->data);
                     $p = $ex[1];
                     if (!$p) $p = 1;
+                    $kb[] = [['text' => $l['wb_models'], 'callback_data' => '/models']];
                     if ($p > 1000) {
                         $botid = $p;
                         $bots = json_decode($user->db->bots, true);
@@ -347,7 +444,9 @@ if (isset($bot)) {
                                 //TODO Webhook Models
                                 $user->db->setColumn('state', 'setwb ' . $tok . ' 0');
                                 $kb[] = [['text' => $l['go_back'], 'callback_data' => '/start']];
-                                $bot->editMessageText($user, $message, $l['send_url'], $kb);
+                                $models = json_decode($user->db->models,true);
+                                $m = $models[$user->db->model];
+                                $bot->editMessageText($chat, $message, str_replace(['&name','&limit','&format'],[$m['name'],$m['limit'],$m['format']],$l['send_url']), $kb);
                                 $callback->answer();
                             }
                         }
@@ -362,16 +461,21 @@ if (isset($bot)) {
                             }
                             $max = $p * 6;
                             if ($c < $max) $max = $c;
-                            $count = $min;
+                            $count = 0;
                             foreach ($bots as $botID => $botInfo) {
-                                $line[] = ['text' => $botInfo['username'], 'callback_data' => '/setwebhook ' . $botID];
-                                if ($count % 2 === 1 || $count === $max - 1) {
-                                    $kb[] = $line;
+                                if ($count >= $min && $count < $max) {
+                                    $line[] = ['text' => $botInfo['username'], 'callback_data' => '/setwebhook ' . $botID];
+                                    if ($count % 2 === 1 || $count === $max - 1) {
+                                        $kb[] = $line;
+                                        unset($line);
+                                    }
+                                } elseif ($count >= $max) {
+                                    break;
                                 }
                                 $count++;
                             }
                             if ($p > 1) $nav[] = ['text' => '⬅️', 'callback_data' => '/bots ' . ($p - 1)];
-                            if ($c >= $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
+                            if ($c > $p * 6) $nav[] = ['text' => '➡️', 'callback_data' => '/bots ' . ($p + 1)];
                             if (isset($nav)) $kb[] = $nav;
                         }
                         $user->db->setColumn('state', 'setwb');
@@ -490,6 +594,41 @@ if (isset($bot)) {
                                 $setwb = $botApi->setWebhook($wbinfo->url, false, $wbinfo->max_connections);
                                 $bot->sendMessage($user, $l['updates_deleted'], $kb);
                             }
+                        } elseif (stripos($user->db->state,'addmodel') === 0) {
+                            $js = json_decode(ltrim($user->db->state,'addmodel'),true);
+                            $kb = [
+                                [['text' => $l['go_back'], 'callback_data' => '/models']],
+                            ];
+                            if (!isset($js['name'])) {
+                                if (strlen($message->text) > 12) {
+                                    $bot->sendMessage($user,str_replace('&ch',12,$l['e_ch_limit'],$kb));
+                                } else {
+                                    $js['name'] = $message->text;
+                                    $user->db->setColumn('state','addmodel' . json_encode($js));
+                                    $bot->sendMessage($user, $l['model_send_limit'],$kb);
+                                }
+                            } elseif (!isset($js['limit'])) {
+                                if (!is_numeric($message->text) || (int)$message->text < 1 || (int)$message->text > 100) {
+                                    $bot->sendMessage($user, $l['e_connection_limit'],$kb);
+                                } else {
+                                    $js['limit'] = (int)$message->text;
+                                    $user->db->setColumn('state','addmodel' . json_encode($js));
+                                    $bot->sendMessage($user, $l['model_send_url'],$kb);
+                                }
+                            } elseif (!isset($js['format'])) {
+                                if (strlen($message->text) > 150) {
+                                    $bot->sendMessage($user,str_replace('&ch',150,$l['e_ch_limit'],$kb));
+                                } elseif (stripos($message->text,'{LINKWB}') === false) {
+                                    $bot->sendMessage($user,$l['e_weburl'],$kb);
+                                } else {
+                                    $js['format'] = $message->text;
+                                    $user->db->setColumn('state','');
+                                    $models = json_decode($user->db->models,true);
+                                    $models[] = $js;
+                                    $user->db->setColumn('models',json_encode($models));
+                                    $bot->sendMessage($user, $l['model_created'],$kb);
+                                }
+                            }
                         } elseif (stripos($user->db->state,'setwb') === 0) {
                             $ex = explode(' ',$user->db->state);
                             $kb = [
@@ -503,15 +642,21 @@ if (isset($bot)) {
                                     $bot->sendMessage($user,$l['e_token_not_valid'],$kb);
                                 } else {
                                     $user->db->setColumn('state', 'setwb ' . $tok . ' 0');
-                                    //TODO Webhook Models
-                                    $bot->sendMessage($user, $message, $l['send_url'], $kb);
-                                    $callback->answer();
+                                    $models = json_decode($user->db->models,true);
+                                    $m = $models[$user->db->model];
+                                    $bot->sendMessage($user, $message, str_replace(['&name','&limit','&format'],[$m['name'],$m['limit'],$m['format']],$l['send_url']), $kb);
                                 }
                             } elseif (isset($ex[2])) {
                                 $tok = $ex[1];
                                 $botApi = new botApi('bot' . $tok,$config);
+                                $getMe = $botApi->getMe();
                                 $wburl = $message->text;
-                                $setwb = $botApi->setWebhook($wburl);
+                                $models = json_decode($user->db->models,true);
+                                $m = $models[$user->db->model];
+                                $vars = ['{LINKWB}','{TOKEN}','{USERBOT}','{BOTID}','{USERID}','{USERNAME}'];
+                                $reps = [$wburl,$tok,$getMe->username,$getMe->id,$user->id,$user->username];
+                                $wburl = str_replace($vars,$reps,$m['format']);
+                                $setwb = $botApi->setWebhook($wburl,$m['limit']);
                                 if (!$setwb->ok) {
                                     $bot->sendMessage($user,str_replace('&error',$setwb->description,$l['wb_not_set']),$kb);
                                 } else {
